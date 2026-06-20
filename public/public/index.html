@@ -151,7 +151,7 @@ async function loadInventory() {
   try {
     const data = await apiCall(`applications/${TABLE_ID}/records/list/`, 'POST', {
       hydrated: true,
-      pagination: { limit: 500 }
+      pagination: { limit: 1200 }
     });
     recordMap = {};
     if (data.items) {
