@@ -155,7 +155,7 @@ async function loadInventory() {
     if (data.items) {
       data.items.forEach(record => {
         const title = record.title || '';
-        const linkedApts = record.s6bc447e68 || [];
+        const linkedApts = record.s366d5de9a || [];
         const aptTitles = Array.isArray(linkedApts) ? linkedApts.map(a => a.title || a.value || '') : [];
         if (aptTitles.some(a => a === apt)) {
           recordMap[title] = record.id;
@@ -184,7 +184,7 @@ async function submitForm() {
     const id = recordMap[item.name];
     if (!id) { errors++; continue; }
     try {
-      await apiCall(`applications/${TABLE_ID}/records/${id}/`, 'PATCH', { s_unidad: item.value });
+      await apiCall(`applications/${TABLE_ID}/records/${id}/`, 'PATCH', { s6ff63d021: item.value });
     } catch(e) { errors++; }
   }
   if (errors === 0) {
