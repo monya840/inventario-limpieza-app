@@ -30,15 +30,15 @@ export default async function handler(req, res) {
     try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
     if (parsed.items) {
-      // Log primeros 5 registros con su piso y título
-      const sample = parsed.items.slice(0, 5).map(r => ({
-        title: r.title,
-        apt: (r.s366d5de9a || []).map(a => a.title)
-      }));
-      console.log('SAMPLE:', JSON.stringify(sample));
-      console.log('TOTAL:', parsed.items.length);
+      console.log('TOTAL records:', parsed.items.length);
+      // Log unique apartment names found
+      const apts = new Set();
+      parsed.items.forEach(r => {
+        (r.s366d5de9a || []).forEach(a => apts.add(a.title));
+      });
+      console.log('APTS found:', JSON.stringify([...apts].slice(0, 10)));
     } else {
-      console.log('PATCH:', response.status, text.substring(0, 200));
+      console.log('Response:', response.status, text.substring(0, 300));
     }
 
     return res.status(response.status).json(parsed);
