@@ -1,21 +1,16 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ACCOUNT-ID');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ACCOUNT-ID, x-api-key, x-account-id');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { path } = req.query;
   if (!path) return res.status(400).json({ error: 'Missing path' });
 
-  const apiKey   = req.headers['x-api-key'];
+  const apiKey    = req.headers['x-api-key'];
   const accountId = req.headers['x-account-id'];
-
-  if (!apiKey || !accountId) {
-    return res.status(400).json({ error: 'Missing API key or account ID' });
-  }
+  if (!apiKey || !accountId) return res.status(400).json({ error: 'Missing credentials' });
 
   const url = `https://app.smartsuite.com/api/v1/${path}`;
 
@@ -27,14 +22,28 @@ export default async function handler(req, res) {
         'ACCOUNT-ID': accountId,
         'Content-Type': 'application/json',
       },
-      body: ['POST', 'PATCH', 'PUT'].includes(req.method)
-        ? JSON.stringify(req.body)
-        : undefined,
+      body: ['POST', 'PATCH', 'PUT'].includes(req.method) ? JSON.stringify(req.body) : undefined,
     });
 
-    const data = await response.json();
-    return res.status(response.status).json(data);
+    const text = await response.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+    if (parsed.items) {
+      // Log primeros 5 registros con su piso y título
+      const sample = parsed.items.slice(0, 5).map(r => ({
+        title: r.title,
+        apt: (r.s366d5de9a || []).map(a => a.title)
+      }));
+      console.log('SAMPLE:', JSON.stringify(sample));
+      console.log('TOTAL:', parsed.items.length);
+    } else {
+      console.log('PATCH:', response.status, text.substring(0, 200));
+    }
+
+    return res.status(response.status).json(parsed);
   } catch (err) {
+    console.error('Error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 }
