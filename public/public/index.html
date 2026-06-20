@@ -88,6 +88,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 const WORKSPACE_ID = 'sy3n9ee9';
 const TABLE_ID     = '6984b83b5db666742c541b70';
 const PROXY        = '/api/smartsuite';
+const SLUG_APTS    = 's366d5de9a';
+const SLUG_UNIDAD  = 's6ff63d021';
 
 const LIQUIDOS = [
   { name: 'Lejía garrafa 5 litros' },
@@ -155,8 +157,9 @@ async function loadInventory() {
     if (data.items) {
       data.items.forEach(record => {
         const title = record.title || '';
-        const linkedApts = record.s366d5de9a || [];
-        const aptTitles = Array.isArray(linkedApts) ? linkedApts.map(a => a.title || a.value || '') : [];
+        const linkedApts = record[SLUG_APTS] || [];
+        // El título del piso está en .title de cada elemento
+        const aptTitles = Array.isArray(linkedApts) ? linkedApts.map(a => a.title || '') : [];
         if (aptTitles.some(a => a === apt)) {
           recordMap[title] = record.id;
         }
@@ -176,19 +179,25 @@ async function submitForm() {
   btn.disabled = true;
   showStatus('submit-status', 'Guardando...', 'loading');
   let errors = 0;
+  let notFound = 0;
   const all = [
     ...LIQUIDOS.map(p => ({ name: p.name, value: LVL_VAL[bState[p.name]] })),
     ...[...UTENSILIOS,...HERRAMIENTAS].map(p => ({ name: p.name, value: cState[p.name] }))
   ];
   for (const item of all) {
     const id = recordMap[item.name];
-    if (!id) { errors++; continue; }
+    if (!id) { notFound++; continue; }
     try {
-      await apiCall(`applications/${TABLE_ID}/records/${id}/`, 'PATCH', { s6ff63d021: item.value });
+      await apiCall(`applications/${TABLE_ID}/records/${id}/`, 'PATCH', {
+        [SLUG_UNIDAD]: item.value
+      });
     } catch(e) { errors++; }
   }
-  if (errors === 0) {
+  if (errors === 0 && notFound === 0) {
     showStatus('submit-status', '✓ Recuento guardado correctamente', 'success');
+  } else if (notFound > 0) {
+    showStatus('submit-status', `${notFound} productos no encontrados en este piso. ${errors} errores.`, 'error');
+    btn.disabled = false;
   } else {
     showStatus('submit-status', `${errors} productos no se pudieron guardar.`, 'error');
     btn.disabled = false;
