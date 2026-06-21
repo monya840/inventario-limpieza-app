@@ -47,13 +47,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </style>
 </head>
 <body>
-
 <div class="top-bar">
   <div class="title">Inventario de limpieza</div>
   <div class="apt" id="apt-label">&nbsp;</div>
   <div class="prog-bar"><div class="prog-fill" id="prog" style="width:0%"></div></div>
 </div>
-
 <div class="body">
   <div class="config-panel" id="config-panel">
     <div class="config-title">Configuración</div>
@@ -63,14 +61,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="config-row">
       <label>Piso</label>
-      <select id="apt-select">
-        <option value="">Selecciona el piso...</option>
-      </select>
+      <select id="apt-select"><option value="">Selecciona el piso...</option></select>
     </div>
     <button class="config-btn" onclick="loadInventory()">Cargar inventario</button>
     <div class="status-box loading hidden" id="load-status"></div>
   </div>
-
   <div id="form-body" class="hidden">
     <div class="sec-label">💧 Líquidos — toca el nivel del bote</div>
     <div class="bottles-grid" id="bottles-grid"></div>
@@ -83,7 +78,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="status-box hidden" id="submit-status"></div>
   </div>
 </div>
-
 <script>
 const WORKSPACE_ID = 'sy3n9ee9';
 const TABLE_ID     = '6984b83b5db666742c541b70';
@@ -92,7 +86,7 @@ const SLUG_APTS    = 's366d5de9a';
 const SLUG_UNIDAD  = 's6ff63d021';
 
 const LIQUIDOS = [
-  { name: 'Lejía garrafa 5 litros' },
+  { name: 'Lejia garrafa 5 litros' },
   { name: 'Fregasuelo garrafa 5 litros' },
   { name: 'Desengrasante garrafa 5 litros' },
   { name: 'Vinagre garrafa 5 litros' },
@@ -101,14 +95,14 @@ const UTENSILIOS = [
   { name: 'Bayetas',             unit: 'uds' },
   { name: 'Estropajos verdes',   unit: 'uds' },
   { name: 'Rollo papel azul',    unit: 'rollos' },
-  { name: 'Cajas guantes látex', unit: 'cajas' },
+  { name: 'Cajas con guantes - latex', unit: 'cajas' },
 ];
 const HERRAMIENTAS = [
-  { name: 'Mocho (sin palo)',           unit: 'uds' },
-  { name: 'Cubo fregona',              unit: 'uds' },
-  { name: 'Cepillo escoba (sin palo)', unit: 'uds' },
-  { name: 'Palo (escoba/fregona)',      unit: 'uds' },
-  { name: 'Recogedor (pala + palo)',    unit: 'uds' },
+  { name: 'Mocho (sin palo)',             unit: 'uds' },
+  { name: 'Cubo fregona',                unit: 'uds' },
+  { name: 'Cepillo de escoba (sin palo)', unit: 'uds' },
+  { name: 'Palo (scoba, fregona etc...)', unit: 'uds' },
+  { name: 'Recogedor (pala + palo)',      unit: 'uds' },
 ];
 const PISOS = [
   'Alegre de Dalt 26 - 2-3','Amigo 25 - 1-2','Arago 109 - 1-1','Arago 109 - PR-2',
@@ -149,22 +143,33 @@ async function loadInventory() {
   if (!apt) { showStatus('load-status', 'Selecciona un piso', 'error'); return; }
   showStatus('load-status', 'Cargando inventario...', 'loading');
   try {
+    // Una sola llamada filtrando por piso directamente
     const data = await apiCall(`applications/${TABLE_ID}/records/list/`, 'POST', {
       hydrated: true,
-      pagination: { limit: 1200 }
+      filter: {
+        operator: 'and',
+        fields: [{
+          field: { slug: SLUG_APTS },
+          comparison: 'contains',
+          value: apt
+        }]
+      },
+      pagination: { limit: 50 }
     });
+
     recordMap = {};
     if (data.items) {
       data.items.forEach(record => {
-        const title = record.title || '';
-        const linkedApts = record[SLUG_APTS] || [];
-        // El título del piso está en .title de cada elemento
-        const aptTitles = Array.isArray(linkedApts) ? linkedApts.map(a => a.title || '') : [];
-        if (aptTitles.some(a => a === apt)) {
-          recordMap[title] = record.id;
-        }
+        recordMap[record.title] = record.id;
       });
     }
+
+    const found = Object.keys(recordMap).length;
+    if (found === 0) {
+      showStatus('load-status', `No se encontraron registros para "${apt}"`, 'error');
+      return;
+    }
+
     document.getElementById('apt-label').textContent = apt;
     document.getElementById('config-panel').classList.add('hidden');
     document.getElementById('form-body').classList.remove('hidden');
@@ -179,27 +184,27 @@ async function submitForm() {
   btn.disabled = true;
   showStatus('submit-status', 'Guardando...', 'loading');
   let errors = 0;
-  let notFound = 0;
+  let notFound = [];
   const all = [
     ...LIQUIDOS.map(p => ({ name: p.name, value: LVL_VAL[bState[p.name]] })),
     ...[...UTENSILIOS,...HERRAMIENTAS].map(p => ({ name: p.name, value: cState[p.name] }))
   ];
   for (const item of all) {
     const id = recordMap[item.name];
-    if (!id) { notFound++; continue; }
+    if (!id) { notFound.push(item.name); continue; }
     try {
       await apiCall(`applications/${TABLE_ID}/records/${id}/`, 'PATCH', {
         [SLUG_UNIDAD]: item.value
       });
     } catch(e) { errors++; }
   }
-  if (errors === 0 && notFound === 0) {
+  if (errors === 0 && notFound.length === 0) {
     showStatus('submit-status', '✓ Recuento guardado correctamente', 'success');
-  } else if (notFound > 0) {
-    showStatus('submit-status', `${notFound} productos no encontrados en este piso. ${errors} errores.`, 'error');
+  } else if (notFound.length > 0) {
+    showStatus('submit-status', `No encontrados: ${notFound.join(', ')}`, 'error');
     btn.disabled = false;
   } else {
-    showStatus('submit-status', `${errors} productos no se pudieron guardar.`, 'error');
+    showStatus('submit-status', `${errors} errores al guardar.`, 'error');
     btn.disabled = false;
   }
 }
@@ -234,20 +239,10 @@ function makeSVG(name, level) {
     const active=level!==null&&FILLS[level]>=(mi+1)*0.2-0.05;
     s+=`<line x1="${bx+5}" y1="${my}" x2="${bx+bw-5}" y2="${my}" stroke="${active?fillColor:'#ccc'}" stroke-width="${active?2:1}" stroke-dasharray="5 3"/>`;
   });
-  const zones=[
-    {top:lineY[0]+1,bot:bbot,lv:0},
-    {top:lineY[1]+1,bot:lineY[0]-1,lv:1},
-    {top:lineY[2]+1,bot:lineY[1]-1,lv:2},
-    {top:lineY[3]+1,bot:lineY[2]-1,lv:3},
-    {top:btop,bot:lineY[3]-1,lv:4},
-  ];
-  zones.forEach(z=>{
-    s+=`<rect x="${bx}" y="${z.top}" width="${bw}" height="${Math.max(z.bot-z.top,12)}" fill="transparent" class="tap" data-name="${name}" data-level="${z.lv}" style="cursor:pointer"/>`;
-  });
+  const zones=[{top:lineY[0]+1,bot:bbot,lv:0},{top:lineY[1]+1,bot:lineY[0]-1,lv:1},{top:lineY[2]+1,bot:lineY[1]-1,lv:2},{top:lineY[3]+1,bot:lineY[2]-1,lv:3},{top:btop,bot:lineY[3]-1,lv:4}];
+  zones.forEach(z=>{s+=`<rect x="${bx}" y="${z.top}" width="${bw}" height="${Math.max(z.bot-z.top,12)}" fill="transparent" class="tap" data-name="${name}" data-level="${z.lv}" style="cursor:pointer"/>`;});
   const lX=bx+bw+4;
-  [[bbot-bh*0.1,'Vacío'],[bbot-bh*0.3,'¼'],[bbot-bh*0.5,'½'],[bbot-bh*0.7,'¾'],[bbot-bh*0.9,'Lleno']].forEach(([y,txt],li)=>{
-    s+=`<text x="${lX}" y="${y+4}" font-size="9" fill="${level===li?COLORS[li]:'#aaa'}" font-weight="${level===li?500:400}">${txt}</text>`;
-  });
+  [[bbot-bh*0.1,'Vacío'],[bbot-bh*0.3,'¼'],[bbot-bh*0.5,'½'],[bbot-bh*0.7,'¾'],[bbot-bh*0.9,'Lleno']].forEach(([y,txt],li)=>{s+=`<text x="${lX}" y="${y+4}" font-size="9" fill="${level===li?COLORS[li]:'#aaa'}" font-weight="${level===li?500:400}">${txt}</text>`;});
   s+='</svg>';
   return s;
 }
@@ -256,8 +251,7 @@ function attachTaps(container) {
   container.querySelectorAll('.tap').forEach(el=>{
     el.addEventListener('click',function(){
       bState[this.getAttribute('data-name')]=parseInt(this.getAttribute('data-level'));
-      renderBottles();
-      updateProgress();
+      renderBottles(); updateProgress();
     });
   });
 }
@@ -269,12 +263,7 @@ function renderBottles() {
     const lv=bState[p.name];
     const card=document.createElement('div');
     card.className='bottle-card'+(lv!==null&&lv<=1?' warn':lv!==null?' filled':'');
-    card.innerHTML=`
-      <div class="b-name">${p.name}</div>
-      <div>${makeSVG(p.name,lv)}</div>
-      <div class="b-level" style="color:${lv!==null?COLORS[lv]:'#888'}">${lv!==null?LEVELS[lv]:'—'}</div>
-      <div class="b-hint">${lv!==null?(lv<=1?'⚠ bajo mínimo':'✓ ok'):'toca el nivel'}</div>
-    `;
+    card.innerHTML=`<div class="b-name">${p.name}</div><div>${makeSVG(p.name,lv)}</div><div class="b-level" style="color:${lv!==null?COLORS[lv]:'#888'}">${lv!==null?LEVELS[lv]:'—'}</div><div class="b-hint">${lv!==null?(lv<=1?'⚠ bajo mínimo':'✓ ok'):'toca el nivel'}</div>`;
     grid.appendChild(card);
   });
   attachTaps(grid);
@@ -287,14 +276,7 @@ function renderCounters(listId,items) {
     const v=cState[p.name];
     const row=document.createElement('div');
     row.className='prod-row'+(v!==null?' filled':'');
-    row.innerHTML=`
-      <div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-unit">${p.unit}</div></div>
-      <div class="qty-ctrl">
-        <button class="qty-btn" data-name="${p.name}" data-delta="-1">−</button>
-        <span class="qty-val ${v!==null?'has-val':''}">${v!==null?v:'—'}</span>
-        <button class="qty-btn" data-name="${p.name}" data-delta="1">+</button>
-      </div>
-    `;
+    row.innerHTML=`<div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-unit">${p.unit}</div></div><div class="qty-ctrl"><button class="qty-btn" data-name="${p.name}" data-delta="-1">−</button><span class="qty-val ${v!==null?'has-val':''}">${v!==null?v:'—'}</span><button class="qty-btn" data-name="${p.name}" data-delta="1">+</button></div>`;
     el.appendChild(row);
   });
   el.querySelectorAll('.qty-btn').forEach(btn=>{
@@ -302,8 +284,7 @@ function renderCounters(listId,items) {
       const name=this.getAttribute('data-name');
       const cur=cState[name]!==null?cState[name]:0;
       cState[name]=Math.max(0,cur+parseInt(this.getAttribute('data-delta')));
-      renderCounters(listId,items);
-      updateProgress();
+      renderCounters(listId,items); updateProgress();
     });
   });
 }
@@ -316,11 +297,7 @@ function renderAll() {
 }
 
 const sel=document.getElementById('apt-select');
-PISOS.forEach(p=>{
-  const opt=document.createElement('option');
-  opt.value=p; opt.textContent=p;
-  sel.appendChild(opt);
-});
+PISOS.forEach(p=>{const opt=document.createElement('option');opt.value=p;opt.textContent=p;sel.appendChild(opt);});
 </script>
 </body>
 </html>
