@@ -85,7 +85,6 @@ const PROXY        = '/api/smartsuite';
 const SLUG_APTS    = 's366d5de9a';
 const SLUG_UNIDAD  = 's6ff63d021';
 
-// Nombres EXACTOS como aparecen en SmartSuite (sin tildes donde SmartSuite no las tiene)
 const LIQUIDOS = [
   { name: 'Lejia garrafa 5 litros' },
   { name: 'Fregasuelo garrafa 5 litros' },
@@ -99,11 +98,11 @@ const UTENSILIOS = [
   { name: 'Cajas con guantes - latex', unit: 'cajas' },
 ];
 const HERRAMIENTAS = [
-  { name: 'Mocho (sin palo)',           unit: 'uds' },
-  { name: 'Cubo fregona',              unit: 'uds' },
+  { name: 'Mocho (sin palo)',             unit: 'uds' },
+  { name: 'Cubo fregona',                unit: 'uds' },
   { name: 'Cepillo de escoba (sin palo)', unit: 'uds' },
   { name: 'Palo (scoba, fregona etc...)', unit: 'uds' },
-  { name: 'Recogedor (pala + palo)',    unit: 'uds' },
+  { name: 'Recogedor (pala + palo)',      unit: 'uds' },
 ];
 const PISOS = [
   'Alegre de Dalt 26 - 2-3','Amigo 25 - 1-2','Arago 109 - 1-1','Arago 109 - PR-2',
@@ -144,30 +143,32 @@ async function loadInventory() {
   if (!apt) { showStatus('load-status', 'Selecciona un piso', 'error'); return; }
   showStatus('load-status', 'Cargando inventario...', 'loading');
   try {
-    // Paginar para traer todos los registros
-    let allItems = [];
-    let offset = 0;
-    const limit = 200;
-    while (true) {
-      const data = await apiCall(`applications/${TABLE_ID}/records/list/`, 'POST', {
-        hydrated: true,
-        pagination: { limit, offset }
-      });
-      if (!data.items || data.items.length === 0) break;
-      allItems = allItems.concat(data.items);
-      if (data.items.length < limit) break;
-      offset += limit;
-    }
+    // Una sola llamada filtrando por piso directamente
+    const data = await apiCall(`applications/${TABLE_ID}/records/list/`, 'POST', {
+      hydrated: true,
+      filter: {
+        operator: 'and',
+        fields: [{
+          field: { slug: SLUG_APTS },
+          comparison: 'contains',
+          value: apt
+        }]
+      },
+      pagination: { limit: 50 }
+    });
 
     recordMap = {};
-    allItems.forEach(record => {
-      const title = record.title || '';
-      const linkedApts = record[SLUG_APTS] || [];
-      const aptTitles = Array.isArray(linkedApts) ? linkedApts.map(a => a.title || '') : [];
-      if (aptTitles.some(a => a === apt)) {
-        recordMap[title] = record.id;
-      }
-    });
+    if (data.items) {
+      data.items.forEach(record => {
+        recordMap[record.title] = record.id;
+      });
+    }
+
+    const found = Object.keys(recordMap).length;
+    if (found === 0) {
+      showStatus('load-status', `No se encontraron registros para "${apt}"`, 'error');
+      return;
+    }
 
     document.getElementById('apt-label').textContent = apt;
     document.getElementById('config-panel').classList.add('hidden');
