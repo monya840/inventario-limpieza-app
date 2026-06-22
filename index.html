@@ -145,7 +145,7 @@ async function loadInventory() {
   try {
     // Traer todos los registros y filtrar en cliente
     const data = await apiCall(`applications/${TABLE_ID}/records/list/`, 'POST', {
-      hydrated: false,
+      hydrated: true,
       pagination: { limit: 1500 }
     });
 
