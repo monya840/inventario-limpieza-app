@@ -149,7 +149,7 @@ async function loadInventory() {
       filter: {
         operator: 'and',
         fields: [{
-          field: { slug: SLUG_APTS },
+          field: SLUG_APTS,
           comparison: 'is',
           value: [apt]
         }]
