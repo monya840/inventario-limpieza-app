@@ -143,24 +143,20 @@ async function loadInventory() {
   if (!apt) { showStatus('load-status', 'Selecciona un piso', 'error'); return; }
   showStatus('load-status', 'Cargando inventario...', 'loading');
   try {
-    // Una sola llamada filtrando por piso directamente
+    // Traer todos los registros y filtrar en cliente
     const data = await apiCall(`applications/${TABLE_ID}/records/list/`, 'POST', {
-      hydrated: true,
-      filter: {
-        operator: 'and',
-        fields: [{
-          field: SLUG_APTS,
-          comparison: 'is',
-          value: [apt]
-        }]
-      },
-      pagination: { limit: 50 }
+      hydrated: false,
+      pagination: { limit: 1500 }
     });
 
     recordMap = {};
     if (data.items) {
       data.items.forEach(record => {
-        recordMap[record.title] = record.id;
+        const linkedApts = record[SLUG_APTS] || [];
+        const aptTitles = Array.isArray(linkedApts) ? linkedApts.map(a => a.title || a.value || '') : [];
+        if (aptTitles.some(a => a === apt)) {
+          recordMap[record.title] = record.id;
+        }
       });
     }
 
