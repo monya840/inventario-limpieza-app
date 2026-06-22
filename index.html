@@ -150,8 +150,8 @@ async function loadInventory() {
         operator: 'and',
         fields: [{
           field: { slug: SLUG_APTS },
-          comparison: 'contains',
-          value: apt
+          comparison: 'is',
+          value: [apt]
         }]
       },
       pagination: { limit: 50 }
